@@ -119,22 +119,22 @@ func checkEmpty(c *gin.Context, str string) {
 }
 
 func checkUserCredentials(c *gin.Context) {
-	// var newUser User
-	// var data string
-	// // Attempt to bind the request body to the User struct.
-	// if err := c.BindJSON(&newUser); err != nil {
-	// 	checkErr(c, http.StatusBadRequest, err, "Invalid input")
-	// 	return
-	// }
-	// log.Printf("INFO: Login attempt for user: %s", newUser.UserName)
+	var newUser User
+	var data string
+	// Attempt to bind the request body to the User struct.
+	if err := c.BindJSON(&newUser); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+	log.Printf("INFO: Login attempt for user: %s", newUser.UserName)
 
-	// // Call the corresponding database function to authenticate the user.
-	// query := `SELECT state_manager.get_user_id_by_credentials($1, $2)`
-	// if err := db.QueryRow(query, newUser.UserName, newUser.Password).Scan(&data); err != nil {
-	// 	checkErr(c, http.StatusBadRequest, err, "Failed to get user ID")
-	// 	return
-	// }
+	// Call the corresponding database function to authenticate the user.
+	query := `SELECT project_manager.get_user_id_by_credentials($1, $2)`
+	if err := db.QueryRow(query, newUser.UserName, newUser.Password).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get user ID")
+		return
+	}
 	// Return the raw JSON data from the database directly to the client.
-	// c.Data(http.StatusOK, "application/json", []byte(data))
-	c.IndentedJSON(http.StatusOK, "ok")
+	c.Data(http.StatusOK, "application/json", []byte(data))
+	// c.IndentedJSON(http.StatusOK, "ok")
 }

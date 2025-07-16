@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,14 @@ import (
 type User struct {
 	UserName string `json:"userName"`
 	Password string `json:"password"`
+}
+
+type NewProject struct {
+	ProjectName string    `json:"projectName"`
+	Description string    `json:"description"`
+	CreatorID   int       `json:"creatorId"`
+	TargetDate  time.Time `json:"targetDate"`
+	PicID       int       `json:"picId"`
 }
 
 // Global variables for the database connection and the Gin engine.
@@ -54,6 +63,10 @@ func init() {
 func registerRoutes(router *gin.RouterGroup) {
 	// Authentication
 	router.POST("/login", checkUserCredentials)
+
+	// Project
+	router.POST("/postNewProject", postNewProject)
+	router.GET("/getProjects", getProjects)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -137,4 +150,32 @@ func checkUserCredentials(c *gin.Context) {
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
 	// c.IndentedJSON(http.StatusOK, "ok")
+}
+
+func getProjects(c *gin.Context) {
+	var data string
+
+	// Call the function to get the projects data
+	query := `SELECT project_manager.get_projects()`
+	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get projects")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewProject(c *gin.Context) {
+	var np NewProject
+	if err := c.BindJSON(&np); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.post_new_project($1,$2,$3,$4,$5)`
+	if _, err := db.Exec(query, np.ProjectName, np.Description, np.CreatorID, np.TargetDate, np.PicID); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create project")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "ok")
 }

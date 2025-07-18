@@ -17,7 +17,7 @@ import (
 
 // User represents a user for authentication purposes.
 type User struct {
-	UserName string `json:"userName"`
+	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
@@ -67,6 +67,9 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Project
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getProjects", getProjects)
+
+	// Other data
+	router.GET("/getUsernames", getUsernames)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -139,17 +142,29 @@ func checkUserCredentials(c *gin.Context) {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-	log.Printf("INFO: Login attempt for user: %s", newUser.UserName)
+	log.Printf("INFO: Login attempt for user: %s", newUser.Username)
 
 	// Call the corresponding database function to authenticate the user.
 	query := `SELECT project_manager.get_user_id_by_credentials($1, $2)`
-	if err := db.QueryRow(query, newUser.UserName, newUser.Password).Scan(&data); err != nil {
+	if err := db.QueryRow(query, newUser.Username, newUser.Password).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get user ID")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
 	// c.IndentedJSON(http.StatusOK, "ok")
+}
+
+func getUsernames(c *gin.Context) {
+	var data string
+
+	query := `SELECT project_manager.get_usernames()`
+	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get usernames")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
 func getProjects(c *gin.Context) {

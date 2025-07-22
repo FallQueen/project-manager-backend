@@ -29,31 +29,27 @@ type User struct {
 // 	PicId       int       `json:"picId"`
 // }
 
-type AlterUserProjectRole struct {
-	RoleId    int   `json:"roleId"`
-	ProjectId int   `json:"projectId"`
-	UserIds   []int `json:"userIds"`
-}
+// type AlterUserProjectRole struct {
+// 	RoleId    int   `json:"roleId"`
+// 	ProjectId int   `json:"projectId"`
+// 	UserIds   []int `json:"userIds"`
+// }
 
-type NameListItem struct {
-	Name string `json:"name"`
-	Id   int    `json:"id"`
-}
-
-type NameListItemByRole struct {
-	RoleId   int            `json:"roleId"`
-	RoleName string         `json:"roleName"`
-	Users    []NameListItem `json:"users"`
+type UserRoleChange struct {
+	RoleId       int   `json:"roleId"`
+	ProjectId    int   `json:"projectId"`
+	UsersAdded   []int `json:"usersAdded"`
+	UsersRemoved []int `json:"usersRemoved"`
 }
 
 type NewProject struct {
-	ProjectName string               `json:"projectName"`
-	Description string               `json:"description"`
-	CreatedBy   int                  `json:"createdBy"`
-	StartDate   time.Time            `json:"startDate"`
-	TargetDate  time.Time            `json:"targetDate"`
-	PicId       int                  `json:"picId"`
-	UserRoles   []NameListItemByRole `json:"userRoles"`
+	ProjectName string           `json:"projectName"`
+	Description string           `json:"description"`
+	CreatedBy   int              `json:"createdBy"`
+	StartDate   time.Time        `json:"startDate"`
+	TargetDate  time.Time        `json:"targetDate"`
+	PicId       int              `json:"picId"`
+	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
 // Global variables for the database connection and the Gin engine.
@@ -97,8 +93,8 @@ func registerRoutes(router *gin.RouterGroup) {
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
-	router.POST("/setUserProjectRole", setUserProjectRole)
-	router.DELETE("/removeUserProjectRole", removeUserProjectRole)
+	router.PUT("/putUserProjectRole", putUserProjectRole)
+	// router.DELETE("/removeUserProjectRole", removeUserProjectRole)
 
 	// Other data
 	router.GET("/getUsernames", getUsernames)
@@ -219,20 +215,26 @@ func postNewProject(c *gin.Context) {
 		return
 	}
 
-	query := `CALL project_manager.post_new_project($1,$2,$3,$4,$5)`
-	if _, err := db.Exec(query, np.ProjectName, np.Description, np.CreatedBy, np.TargetDate, np.PicId); err != nil {
+	var projectIdTemp int
+	query := `SELECT project_manager.post_new_project($1,$2,$3,$4,$5)`
+	if err := db.QueryRow(query, np.ProjectName, np.Description, np.CreatedBy, np.TargetDate, np.PicId).Scan(&projectIdTemp); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create project")
 		return
 	}
+	log.Printf("INFO: Project created with ID: %d", projectIdTemp)
 	for _, userRole := range np.UserRoles {
-		query = `CALL project_manager.set_user_project_role($1,$2,$3)`
-		if _, err := db.Exec(query, userRole.RoleId,, userRole.Users); err != nil {
-			checkErr(c, http.StatusBadRequest, err, "Failed to set user project role")
-			return
+		if len(userRole.UsersAdded) != 0 && len(userRole.UsersRemoved) == 0 {
+			userRole.ProjectId = projectIdTemp
+			if err := AlterUserProjectRole(c, userRole); err != nil {
+				checkErr(c, http.StatusBadRequest, err, "Project created successfully but Failed to set user project role")
+				return
+			}
 		}
 	}
+
 	c.IndentedJSON(http.StatusOK, "Project created successfully")
 }
+
 func getUserProjectRoles(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
@@ -245,32 +247,35 @@ func getUserProjectRoles(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func removeUserProjectRole(c *gin.Context) {
-	var alterTarget AlterUserProjectRole
+// func removeUserProjectRole(c *gin.Context) {
+// 	var alterTarget AlterUserProjectRole
+// 	if err := c.BindJSON(&alterTarget); err != nil {
+// 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+// 		return
+// 	}
+// 	log.Println("INFO: Removing user project role for project ID:", alterTarget.ProjectId, "and user IDs:", alterTarget.UserIds)
+// 	query := `CALL project_manager.remove_user_project_role($1,$2)`
+// 	if _, err := db.Exec(query, alterTarget.ProjectId, alterTarget.UserIds); err != nil {
+// 		checkErr(c, http.StatusBadRequest, err, "Failed to remove user project role")
+// 		return
+// 	}
+// 	c.IndentedJSON(http.StatusOK, "User project role removed successfully")
+// }
+
+func putUserProjectRole(c *gin.Context) {
+	var alterTarget UserRoleChange
 	if err := c.BindJSON(&alterTarget); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-	log.Println("INFO: Removing user project role for project ID:", alterTarget.ProjectId, "and user IDs:", alterTarget.UserIds)
-	query := `CALL project_manager.remove_user_project_role($1,$2)`
-	if _, err := db.Exec(query, alterTarget.ProjectId, alterTarget.UserIds); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to remove user project role")
-		return
-	}
-	c.IndentedJSON(http.StatusOK, "User project role removed successfully")
+
+	AlterUserProjectRole(c, alterTarget)
 }
 
-func setUserProjectRole(c *gin.Context) {
-	var alterTarget AlterUserProjectRole
-	if err := c.BindJSON(&alterTarget); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Invalid input")
-		return
+func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
+	query := `CALL project_manager.alter_user_project_role($1,$2,$3, $4)`
+	if _, err := db.Exec(query, alterTarget.ProjectId, alterTarget.RoleId, alterTarget.UsersRemoved, alterTarget.UsersAdded); err != nil {
+		return err
 	}
-
-	query := `CALL project_manager.set_user_project_role($1,$2,$3)`
-	if _, err := db.Exec(query, alterTarget.RoleId, alterTarget.ProjectId, alterTarget.UserIds); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to set user project role")
-		return
-	}
-	c.IndentedJSON(http.StatusOK, "user project role set successfully")
+	return nil
 }

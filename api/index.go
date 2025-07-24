@@ -52,6 +52,16 @@ type NewProject struct {
 	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
+type AlterProject struct {
+	ProjectId   *int             `json:"projectId"`
+	ProjectName *string          `json:"projectName"`
+	Description *string          `json:"description"`
+	StartDate   *time.Time       `json:"startDate"`
+	TargetDate  *time.Time       `json:"targetDate"`
+	PicId       *int             `json:"picId"`
+	UserRoles   []UserRoleChange `json:"userRoles"`
+}
+
 // Global variables for the database connection and the Gin engine.
 var (
 	db  *sql.DB
@@ -90,6 +100,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Project
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getProjects", getProjects)
+	router.PUT("/putAlterProject", putAlterProject)
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
@@ -225,6 +236,31 @@ func postNewProject(c *gin.Context) {
 	for _, userRole := range np.UserRoles {
 		if len(userRole.UsersAdded) != 0 && len(userRole.UsersRemoved) == 0 {
 			userRole.ProjectId = projectIdTemp
+			if err := AlterUserProjectRole(c, userRole); err != nil {
+				checkErr(c, http.StatusBadRequest, err, "Project created successfully but Failed to set user project role")
+				return
+			}
+		}
+	}
+
+	c.IndentedJSON(http.StatusOK, "Project created successfully")
+}
+
+func putAlterProject(c *gin.Context) {
+	var ap AlterProject
+	if err := c.BindJSON(&ap); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+	query := `CALL project_manager.put_alter_project($1,$2,$3,$4,$5)`
+	if _, err := db.Exec(query, ap.ProjectId, ap.ProjectName, ap.Description, ap.TargetDate, ap.PicId); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to update project")
+		return
+	}
+
+	for _, userRole := range ap.UserRoles {
+		if len(userRole.UsersAdded) != 0 && len(userRole.UsersRemoved) == 0 {
+			userRole.ProjectId = *ap.ProjectId
 			if err := AlterUserProjectRole(c, userRole); err != nil {
 				checkErr(c, http.StatusBadRequest, err, "Project created successfully but Failed to set user project role")
 				return

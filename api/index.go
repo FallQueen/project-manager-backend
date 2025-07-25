@@ -101,10 +101,13 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getProjects", getProjects)
 	router.PUT("/putAlterProject", putAlterProject)
+	router.GET("/getProjectBacklogs", getProjectBacklogs)
+	router.GET("/getBacklogWorks", getBacklogWorks)
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
+
 	// router.DELETE("/removeUserProjectRole", removeUserProjectRole)
 
 	// Other data
@@ -283,21 +286,6 @@ func getUserProjectRoles(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-// func removeUserProjectRole(c *gin.Context) {
-// 	var alterTarget AlterUserProjectRole
-// 	if err := c.BindJSON(&alterTarget); err != nil {
-// 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
-// 		return
-// 	}
-// 	log.Println("INFO: Removing user project role for project ID:", alterTarget.ProjectId, "and user IDs:", alterTarget.UserIds)
-// 	query := `CALL project_manager.remove_user_project_role($1,$2)`
-// 	if _, err := db.Exec(query, alterTarget.ProjectId, alterTarget.UserIds); err != nil {
-// 		checkErr(c, http.StatusBadRequest, err, "Failed to remove user project role")
-// 		return
-// 	}
-// 	c.IndentedJSON(http.StatusOK, "User project role removed successfully")
-// }
-
 func putUserProjectRole(c *gin.Context) {
 	var alterTarget UserRoleChange
 	if err := c.BindJSON(&alterTarget); err != nil {
@@ -314,4 +302,28 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 		return err
 	}
 	return nil
+}
+
+func getProjectBacklogs(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	query := `SELECT project_manager.get_project_backlogs($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project backlogs")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getBacklogWorks(c *gin.Context) {
+	var data string
+	backlogIdInput := c.Query("backlogId")
+	query := `SELECT project_manager.get_backlog_works($1)`
+	if err := db.QueryRow(query, backlogIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get backlog works")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }

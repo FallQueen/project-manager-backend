@@ -42,6 +42,12 @@ type UserRoleChange struct {
 	UsersRemoved []int `json:"usersRemoved"`
 }
 
+type UserWorkChange struct {
+	WorkId       int   `json:"workId"`
+	UsersAdded   []int `json:"usersAdded"`
+	UsersRemoved []int `json:"usersRemoved"`
+}
+
 type NewProject struct {
 	ProjectName string           `json:"projectName"`
 	Description string           `json:"description"`
@@ -107,6 +113,10 @@ func registerRoutes(router *gin.RouterGroup) {
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
+
+	// User Work Assignment
+	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
+	router.PUT("/putAlterUserWorkAssignment", putAlterUserWorkAssignment)
 
 	// router.DELETE("/removeUserProjectRole", removeUserProjectRole)
 
@@ -293,7 +303,12 @@ func putUserProjectRole(c *gin.Context) {
 		return
 	}
 
-	AlterUserProjectRole(c, alterTarget)
+	if err := AlterUserProjectRole(c, alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to alter user project role")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, "Succesfully altered user project role")
 }
 
 func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
@@ -326,4 +341,30 @@ func getBacklogWorks(c *gin.Context) {
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getUserWorkAssignment(c *gin.Context) {
+	var data string
+	workIdInput := c.Query("workId")
+	query := `SELECT project_manager.get_user_work_assignment($1)`
+	if err := db.QueryRow(query, workIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get user work assignment")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func putAlterUserWorkAssignment(c *gin.Context) {
+	var alterTarget UserWorkChange
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+	query := `CALL project_manager.alter_user_work_assignment($1,$2,$3)`
+	if _, err := db.Exec(query, alterTarget.WorkId, alterTarget.UsersRemoved, alterTarget.UsersAdded); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to alter user work assignment")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "Succesfully altered user work assignment")
 }

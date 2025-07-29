@@ -21,14 +21,6 @@ type User struct {
 	Password string `json:"password"`
 }
 
-// type NewProject struct {
-// 	ProjectName string    `json:"projectName"`
-// 	Description string    `json:"description"`
-// 	CreatorID   int       `json:"creatorId"`
-// 	TargetDate  time.Time `json:"targetDate"`
-// 	PicId       int       `json:"picId"`
-// }
-
 // type AlterUserProjectRole struct {
 // 	RoleId    int   `json:"roleId"`
 // 	ProjectId int   `json:"projectId"`
@@ -107,6 +99,8 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getProjects", getProjects)
 	router.PUT("/putAlterProject", putAlterProject)
+
+	// Backlog
 	router.GET("/getProjectBacklogs", getProjectBacklogs)
 	router.GET("/getBacklogWorks", getBacklogWorks)
 
@@ -122,6 +116,8 @@ func registerRoutes(router *gin.RouterGroup) {
 
 	// Other data
 	router.GET("/getUsernames", getUsernames)
+	router.GET("/getProjectAssignedUsernames", getProjectAssignedUsernames)
+	router.GET("/getStartBundle", getTrackerActivityPriorityStateList)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -179,11 +175,13 @@ func checkErr(c *gin.Context, errType int, err error, errMsg string) {
 
 // checkEmpty validates that a required query parameter is not empty.
 // This prevents nil pointer errors and ensures handlers receive necessary data.
-func checkEmpty(c *gin.Context, str string) {
+func checkEmpty(c *gin.Context, str string) bool {
 	if str == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing query parameters"})
 		c.Abort() // Stop processing if a required parameter is missing.
+		return true
 	}
+	return false
 }
 
 func checkUserCredentials(c *gin.Context) {
@@ -213,6 +211,29 @@ func getUsernames(c *gin.Context) {
 	query := `SELECT project_manager.get_usernames()`
 	if err := db.QueryRow(query).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get usernames")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getProjectAssignedUsernames(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	roleIdInput := c.Query("roleId")
+	if checkEmpty(c, roleIdInput) {
+		return
+	}
+	// roleIdsInput = strings.Replace(roleIdsInput, "[", "{", 1)
+	// roleIdsInput = strings.Replace(roleIdsInput, "]", "}", 1)
+
+	query := `SELECT project_manager.get_project_assigned_usernames($1, $2)`
+	if err := db.QueryRow(query, projectIdInput, roleIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project usernames")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
@@ -287,6 +308,9 @@ func putAlterProject(c *gin.Context) {
 func getUserProjectRoles(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
 	query := `SELECT project_manager.get_user_project_roles($1)`
 	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get user project roles")
@@ -322,6 +346,9 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 func getProjectBacklogs(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
 	query := `SELECT project_manager.get_project_backlogs($1)`
 	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get project backlogs")
@@ -334,6 +361,9 @@ func getProjectBacklogs(c *gin.Context) {
 func getBacklogWorks(c *gin.Context) {
 	var data string
 	backlogIdInput := c.Query("backlogId")
+	if checkEmpty(c, backlogIdInput) {
+		return
+	}
 	query := `SELECT project_manager.get_backlog_works($1)`
 	if err := db.QueryRow(query, backlogIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get backlog works")
@@ -346,6 +376,9 @@ func getBacklogWorks(c *gin.Context) {
 func getUserWorkAssignment(c *gin.Context) {
 	var data string
 	workIdInput := c.Query("workId")
+	if checkEmpty(c, workIdInput) {
+		return
+	}
 	query := `SELECT project_manager.get_user_work_assignment($1)`
 	if err := db.QueryRow(query, workIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get user work assignment")
@@ -367,4 +400,15 @@ func putAlterUserWorkAssignment(c *gin.Context) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, "Succesfully altered user work assignment")
+}
+
+func getTrackerActivityPriorityStateList(c *gin.Context) {
+	var data string
+	query := `SELECT project_manager.get_tracker_activity_priority_state_list()`
+	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get start data")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }

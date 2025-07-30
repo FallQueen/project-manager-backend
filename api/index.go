@@ -34,12 +34,6 @@ type UserRoleChange struct {
 	UsersRemoved []int `json:"usersRemoved"`
 }
 
-type UserWorkChange struct {
-	WorkId       int   `json:"workId"`
-	UsersAdded   []int `json:"usersAdded"`
-	UsersRemoved []int `json:"usersRemoved"`
-}
-
 type NewProject struct {
 	ProjectName string           `json:"projectName"`
 	Description string           `json:"description"`
@@ -58,6 +52,43 @@ type AlterProject struct {
 	TargetDate  *time.Time       `json:"targetDate"`
 	PicId       *int             `json:"picId"`
 	UserRoles   []UserRoleChange `json:"userRoles"`
+}
+
+type NewWork struct {
+	BacklogId      int       `json:"backlogId"`
+	WorkName       string    `json:"workName"`
+	Description    string    `json:"description"`
+	StartDate      time.Time `json:"startDate"`
+	TargetDate     time.Time `json:"targetDate"`
+	PicId          *int      `json:"picId"`
+	CurrentState   int       `json:"currentState"`
+	CreatedBy      int       `json:"createdBy"`
+	PriorityId     int       `json:"priorityId"`
+	EstimatedHours int       `json:"estimatedHours"`
+	TrackerId      int       `json:"trackerId"`
+	ActivityId     int       `json:"activityId"`
+	UsersAdded     []int     `json:"usersAdded"`
+}
+
+type AlterWork struct {
+	WorkId         int        `json:"workId"`
+	WorkName       *string    `json:"workName"`
+	Description    *string    `json:"description"`
+	StartDate      *time.Time `json:"startDate"`
+	TargetDate     *time.Time `json:"targetDate"`
+	PicId          *int       `json:"picId"`
+	PriorityId     *int       `json:"priorityId"`
+	EstimatedHours *int       `json:"estimatedHours"`
+	TrackerId      *int       `json:"trackerId"`
+	ActivityId     *int       `json:"activityId"`
+	UsersRemoved   []int      `json:"usersRemoved"`
+	UsersAdded     []int      `json:"usersAdded"`
+}
+
+type UserWorkChange struct {
+	WorkId       int   `json:"workId"`
+	UsersAdded   []int `json:"usersAdded"`
+	UsersRemoved []int `json:"usersRemoved"`
 }
 
 // Global variables for the database connection and the Gin engine.
@@ -100,13 +131,17 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getProjects", getProjects)
 	router.PUT("/putAlterProject", putAlterProject)
 
-	// Backlog
-	router.GET("/getProjectBacklogs", getProjectBacklogs)
-	router.GET("/getBacklogWorks", getBacklogWorks)
-
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
+
+	// Backlog
+	router.GET("/getProjectBacklogs", getProjectBacklogs)
+
+	// Work
+	router.POST("/postNewWork", postNewWork)
+	router.GET("/getBacklogWorks", getBacklogWorks)
+	router.PUT("/putAlterWork", putAlterWork)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -386,6 +421,70 @@ func getUserWorkAssignment(c *gin.Context) {
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewWork(c *gin.Context) {
+	var nw NewWork
+	if err := c.BindJSON(&nw); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	_, err := db.Exec(
+		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		nw.BacklogId,
+		nw.WorkName,
+		nw.PriorityId,
+		nw.PicId,
+		nw.Description,
+		nw.CurrentState,
+		nw.CreatedBy,
+		nw.TargetDate,
+		nw.StartDate,
+		nw.TrackerId,
+		nw.ActivityId,
+		nw.UsersAdded,
+		nw.EstimatedHours,
+	)
+	if err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, "Work created successfully")
+}
+
+func putAlterWork(c *gin.Context) {
+	var alterTarget AlterWork
+
+	// 1. Bind the incoming JSON to the AlterWork struct.
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input format")
+		return
+	}
+
+	// 2. Define the SQL query to call the stored procedure with all 12 parameters.
+	query := `CALL project_manager.put_alter_work($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+
+	if _, err := db.Exec(query,
+		alterTarget.WorkId,
+		alterTarget.WorkName,
+		alterTarget.Description,
+		alterTarget.StartDate,
+		alterTarget.TargetDate,
+		alterTarget.PicId,
+		alterTarget.PriorityId,
+		alterTarget.EstimatedHours,
+		alterTarget.TrackerId,
+		alterTarget.ActivityId,
+		alterTarget.UsersRemoved,
+		alterTarget.UsersAdded,
+	); err != nil {
+		checkErr(c, http.StatusInternalServerError, err, "Failed to alter work details")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Successfully altered work assignment"})
 }
 
 func putAlterUserWorkAssignment(c *gin.Context) {

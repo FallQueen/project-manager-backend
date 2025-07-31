@@ -54,6 +54,17 @@ type AlterProject struct {
 	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
+type NewBacklog struct {
+	ProjectId   int       `json:"projectId"`
+	BacklogName string    `json:"backlogName"`
+	Description string    `json:"description"`
+	StartDate   time.Time `json:"startDate"`
+	TargetDate  time.Time `json:"targetDate"`
+	CreatedBy   int       `json:"createdBy"`
+	PicId       int       `json:"picId"`
+	PriorityId  int       `json:"priorityId"`
+}
+
 type NewWork struct {
 	BacklogId      int       `json:"backlogId"`
 	WorkName       string    `json:"workName"`
@@ -137,6 +148,7 @@ func registerRoutes(router *gin.RouterGroup) {
 
 	// Backlog
 	router.GET("/getProjectBacklogs", getProjectBacklogs)
+	router.POST("/postNewBacklog", postNewBacklog)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)
@@ -260,14 +272,17 @@ func getProjectAssignedUsernames(c *gin.Context) {
 	}
 
 	roleIdInput := c.Query("roleId")
-	if checkEmpty(c, roleIdInput) {
-		return
-	}
-	// roleIdsInput = strings.Replace(roleIdsInput, "[", "{", 1)
-	// roleIdsInput = strings.Replace(roleIdsInput, "]", "}", 1)
+	var query string
+	var err error
 
-	query := `SELECT project_manager.get_project_assigned_usernames($1, $2)`
-	if err := db.QueryRow(query, projectIdInput, roleIdInput).Scan(&data); err != nil {
+	if roleIdInput == "" {
+		query = `SELECT project_manager.get_project_assigned_usernames($1)`
+		err = db.QueryRow(query, projectIdInput).Scan(&data)
+	} else {
+		query = `SELECT project_manager.get_project_assigned_usernames($1, $2)`
+		err = db.QueryRow(query, projectIdInput, roleIdInput).Scan(&data)
+	}
+	if err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get project usernames")
 		return
 	}
@@ -391,6 +406,31 @@ func getProjectBacklogs(c *gin.Context) {
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewBacklog(c *gin.Context) {
+	var nb NewBacklog
+	if err := c.BindJSON(&nb); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.post_new_backlog($1,$2,$3,$4,$5,$6,$7,$8)`
+	if _, err := db.Exec(query,
+		nb.ProjectId,
+		nb.BacklogName,
+		nb.Description,
+		nb.StartDate,
+		nb.TargetDate,
+		nb.CreatedBy,
+		nb.PicId,
+		nb.PriorityId,
+	); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create backlog")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, "Backlog created successfully")
 }
 
 func getBacklogWorks(c *gin.Context) {

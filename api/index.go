@@ -65,6 +65,16 @@ type NewBacklog struct {
 	PriorityId  int       `json:"priorityId"`
 }
 
+type AlterBacklog struct {
+	BacklogId   int        `json:"backlogId"`
+	BacklogName *string    `json:"backlogName"`
+	Description *string    `json:"description"`
+	StartDate   *time.Time `json:"startDate"`
+	TargetDate  *time.Time `json:"targetDate"`
+	PicId       *int       `json:"picId"`
+	PriorityId  *int       `json:"priorityId"`
+}
+
 type NewWork struct {
 	BacklogId      int       `json:"backlogId"`
 	WorkName       string    `json:"workName"`
@@ -88,6 +98,7 @@ type AlterWork struct {
 	StartDate      *time.Time `json:"startDate"`
 	TargetDate     *time.Time `json:"targetDate"`
 	PicId          *int       `json:"picId"`
+	CurrentState   *int       `json:"currentState"`
 	PriorityId     *int       `json:"priorityId"`
 	EstimatedHours *int       `json:"estimatedHours"`
 	TrackerId      *int       `json:"trackerId"`
@@ -433,6 +444,31 @@ func postNewBacklog(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Backlog created successfully")
 }
 
+func putAlterBacklog(c *gin.Context) {
+
+	var alterTarget AlterBacklog
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.put_alter_backlog($1, $2, $3, $4, $5, $6, $7)`
+	if _, err := db.Exec(query,
+		alterTarget.BacklogId,
+		alterTarget.BacklogName,
+		alterTarget.Description,
+		alterTarget.StartDate,
+		alterTarget.TargetDate,
+		alterTarget.PicId,
+		alterTarget.PriorityId,
+	); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to update backlog")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Backlog updated successfully"})
+}
+
 func getBacklogWorks(c *gin.Context) {
 	var data string
 	backlogIdInput := c.Query("backlogId")
@@ -504,7 +540,7 @@ func putAlterWork(c *gin.Context) {
 	}
 
 	// 2. Define the SQL query to call the stored procedure with all 12 parameters.
-	query := `CALL project_manager.put_alter_work($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	query := `CALL project_manager.put_alter_work($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 
 	if _, err := db.Exec(query,
 		alterTarget.WorkId,
@@ -513,6 +549,7 @@ func putAlterWork(c *gin.Context) {
 		alterTarget.StartDate,
 		alterTarget.TargetDate,
 		alterTarget.PicId,
+		alterTarget.CurrentState,
 		alterTarget.PriorityId,
 		alterTarget.EstimatedHours,
 		alterTarget.TrackerId,

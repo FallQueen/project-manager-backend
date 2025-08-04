@@ -165,6 +165,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.POST("/postNewWork", postNewWork)
 	router.GET("/getBacklogWorks", getBacklogWorks)
 	router.PUT("/putAlterWork", putAlterWork)
+	router.GET("/getUserTodoList", getUserTodoList)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -484,6 +485,21 @@ func getBacklogWorks(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
+func getUserTodoList(c *gin.Context) {
+	var data string
+	userIdInput := c.Query("userId")
+	if checkEmpty(c, userIdInput) {
+		return
+	}
+	query := `SELECT project_manager.get_user_todo_list($1)`
+	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get user todo list")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
 func getUserWorkAssignment(c *gin.Context) {
 	var data string
 	workIdInput := c.Query("workId")
@@ -548,8 +564,8 @@ func putAlterWork(c *gin.Context) {
 		alterTarget.Description,
 		alterTarget.StartDate,
 		alterTarget.TargetDate,
-		alterTarget.PicId,
 		alterTarget.CurrentState,
+		alterTarget.PicId,
 		alterTarget.PriorityId,
 		alterTarget.EstimatedHours,
 		alterTarget.TrackerId,

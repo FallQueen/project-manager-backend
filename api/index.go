@@ -160,6 +160,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Backlog
 	router.GET("/getProjectBacklogs", getProjectBacklogs)
 	router.POST("/postNewBacklog", postNewBacklog)
+	router.PUT("/putAlterBacklog", putAlterBacklog)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)

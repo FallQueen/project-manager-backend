@@ -91,6 +91,24 @@ type NewWork struct {
 	UsersAdded     []int     `json:"usersAdded"`
 }
 
+type NewBug struct {
+	BacklogId      int       `json:"backlogId"`
+	WorkName       string    `json:"workName"`
+	Description    string    `json:"description"`
+	StartDate      time.Time `json:"startDate"`
+	TargetDate     time.Time `json:"targetDate"`
+	PicId          *int      `json:"picId"`
+	CurrentState   int       `json:"currentState"`
+	CreatedBy      int       `json:"createdBy"`
+	PriorityId     int       `json:"priorityId"`
+	EstimatedHours int       `json:"estimatedHours"`
+	TrackerId      int       `json:"trackerId"`
+	ActivityId     int       `json:"activityId"`
+	UsersAdded     []int     `json:"usersAdded"`
+	AffectedWork   int       `json:"affectedWork"`
+	DefectCause    int       `json:"defectCause"`
+}
+
 type AlterWork struct {
 	WorkId         int        `json:"workId"`
 	WorkName       *string    `json:"workName"`
@@ -167,6 +185,9 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getBacklogWorks", getBacklogWorks)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.GET("/getUserTodoList", getUserTodoList)
+
+	// Bug
+	router.GET("/getProjectBugs", getProjectBugs)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -247,6 +268,7 @@ func checkEmpty(c *gin.Context, str string) bool {
 func checkUserCredentials(c *gin.Context) {
 	var newUser User
 	var data string
+
 	// Attempt to bind the request body to the User struct.
 	if err := c.BindJSON(&newUser); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
@@ -525,7 +547,6 @@ func postNewWork(c *gin.Context) {
 
 	_, err := db.Exec(
 		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-		nw.BacklogId,
 		nw.WorkName,
 		nw.PriorityId,
 		nw.PicId,
@@ -538,6 +559,7 @@ func postNewWork(c *gin.Context) {
 		nw.ActivityId,
 		nw.UsersAdded,
 		nw.EstimatedHours,
+		nw.BacklogId,
 	)
 	if err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
@@ -593,6 +615,21 @@ func putAlterUserWorkAssignment(c *gin.Context) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, "Succesfully altered user work assignment")
+}
+
+func getProjectBugs(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+	query := `SELECT project_manager.get_project_bugs($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get bug list")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
 func getTrackerActivityPriorityStateList(c *gin.Context) {

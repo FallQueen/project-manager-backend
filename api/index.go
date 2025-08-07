@@ -170,6 +170,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getProjects", getProjects)
 	router.PUT("/putAlterProject", putAlterProject)
+	router.DELETE("/dropProject", dropProject)
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
@@ -179,11 +180,13 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getProjectBacklogs", getProjectBacklogs)
 	router.POST("/postNewBacklog", postNewBacklog)
 	router.PUT("/putAlterBacklog", putAlterBacklog)
+	router.DELETE("/dropBacklog", dropBacklog)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)
 	router.GET("/getBacklogWorks", getBacklogWorks)
 	router.PUT("/putAlterWork", putAlterWork)
+	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
 
 	// Bug
@@ -390,6 +393,19 @@ func putAlterProject(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Project created successfully")
 }
 
+func dropProject(c *gin.Context) {
+	var projectIdInput = c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+	query := `CALL project_manager.drop_project($1)`
+	if _, err := db.Exec(query, projectIdInput); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to drop project")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "Project dropped successfully")
+}
+
 func getUserProjectRoles(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
@@ -426,6 +442,7 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 		return err
 	}
 	return nil
+
 }
 
 func getProjectBacklogs(c *gin.Context) {
@@ -491,6 +508,20 @@ func putAlterBacklog(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Backlog updated successfully"})
+}
+
+func dropBacklog(c *gin.Context) {
+	var backlogIdInput = c.Query("backlogId")
+	if checkEmpty(c, backlogIdInput) {
+		return
+	}
+	query := `CALL project_manager.drop_backlog($1)`
+	if _, err := db.Exec(query, backlogIdInput); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to drop backlog")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, "Backlog dropped successfully")
 }
 
 func getBacklogWorks(c *gin.Context) {
@@ -601,6 +632,19 @@ func putAlterWork(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Successfully altered work assignment"})
+}
+
+func dropWork(c *gin.Context) {
+	var workIdInput = c.Query("workId")
+	if checkEmpty(c, workIdInput) {
+		return
+	}
+	query := `CALL project_manager.drop_work($1)`
+	if _, err := db.Exec(query, workIdInput); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to drop work")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "Work dropped successfully")
 }
 
 func putAlterUserWorkAssignment(c *gin.Context) {

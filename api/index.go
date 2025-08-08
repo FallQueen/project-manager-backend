@@ -168,7 +168,8 @@ func registerRoutes(router *gin.RouterGroup) {
 
 	// Project
 	router.POST("/postNewProject", postNewProject)
-	router.GET("/getProjects", getProjects)
+	router.GET("/getAllProjects", getAllProjects)
+	router.GET("/getUserProjects", getUserProjects)
 	router.PUT("/putAlterProject", putAlterProject)
 	router.DELETE("/dropProject", dropProject)
 
@@ -328,12 +329,29 @@ func getProjectAssignedUsernames(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func getProjects(c *gin.Context) {
+func getAllProjects(c *gin.Context) {
 	var data string
 
 	// Call the function to get the projects data
 	query := `SELECT project_manager.get_projects()`
 	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get projects")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getUserProjects(c *gin.Context) {
+	var data string
+	userIdInput := c.Query("userId")
+	if checkEmpty(c, userIdInput) {
+		return
+	}
+
+	// Call the function to get the projects data
+	query := `SELECT project_manager.get_projects($1)`
+	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get projects")
 		return
 	}

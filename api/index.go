@@ -203,6 +203,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getUsernames", getUsernames)
 	router.GET("/getProjectAssignedUsernames", getProjectAssignedUsernames)
 	router.GET("/getStartBundle", getTrackerActivityPriorityStateList)
+	router.GET("/getProjectAndWorkNames", getProjectAndWorkNames)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -323,6 +324,22 @@ func getProjectAssignedUsernames(c *gin.Context) {
 	}
 	if err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get project usernames")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getProjectAndWorkNames(c *gin.Context) {
+	var data string
+	userIdInput := c.Query("userId")
+	if checkEmpty(c, userIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_project_and_work_names($1)`
+	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project and work names")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.

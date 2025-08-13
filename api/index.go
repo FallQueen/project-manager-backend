@@ -486,9 +486,9 @@ func getProjectBacklogs(c *gin.Context) {
 	if checkEmpty(c, projectIdInput) {
 		return
 	}
-	query := `SELECT project_manager.get_project_backlogs($1)`
+	query := `SELECT project_manager.get_project_sub_modules($1)`
 	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to get project backlogs")
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project sub-modules")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
@@ -502,7 +502,7 @@ func postNewBacklog(c *gin.Context) {
 		return
 	}
 
-	query := `CALL project_manager.post_new_backlog($1,$2,$3,$4,$5,$6,$7,$8)`
+	query := `CALL project_manager.post_new_sub_module($1,$2,$3,$4,$5,$6,$7,$8)`
 	if _, err := db.Exec(query,
 		nb.ProjectId,
 		nb.BacklogName,
@@ -513,11 +513,11 @@ func postNewBacklog(c *gin.Context) {
 		nb.PicId,
 		nb.PriorityId,
 	); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to create backlog")
+		checkErr(c, http.StatusBadRequest, err, "Failed to create sub-module")
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, "Backlog created successfully")
+	c.IndentedJSON(http.StatusOK, "Sub-module created successfully")
 }
 
 func putAlterBacklog(c *gin.Context) {
@@ -528,7 +528,7 @@ func putAlterBacklog(c *gin.Context) {
 		return
 	}
 
-	query := `CALL project_manager.put_alter_backlog($1, $2, $3, $4, $5, $6, $7)`
+	query := `CALL project_manager.put_alter_sub_module($1, $2, $3, $4, $5, $6, $7)`
 	if _, err := db.Exec(query,
 		alterTarget.BacklogId,
 		alterTarget.BacklogName,
@@ -550,7 +550,7 @@ func dropBacklog(c *gin.Context) {
 	if checkEmpty(c, backlogIdInput) {
 		return
 	}
-	query := `CALL project_manager.drop_backlog($1)`
+	query := `CALL project_manager.drop_sub_module($1)`
 	if _, err := db.Exec(query, backlogIdInput); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to drop backlog")
 		return
@@ -565,9 +565,9 @@ func getBacklogWorks(c *gin.Context) {
 	if checkEmpty(c, backlogIdInput) {
 		return
 	}
-	query := `SELECT project_manager.get_backlog_works($1)`
+	query := `SELECT project_manager.get_sub_module_works($1)`
 	if err := db.QueryRow(query, backlogIdInput).Scan(&data); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to get backlog works")
+		checkErr(c, http.StatusBadRequest, err, "Failed to get sub-module works")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.

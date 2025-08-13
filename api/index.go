@@ -54,29 +54,29 @@ type AlterProject struct {
 	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
-type NewBacklog struct {
-	ProjectId   int       `json:"projectId"`
-	BacklogName string    `json:"backlogName"`
-	Description string    `json:"description"`
-	StartDate   time.Time `json:"startDate"`
-	TargetDate  time.Time `json:"targetDate"`
-	CreatedBy   int       `json:"createdBy"`
-	PicId       int       `json:"picId"`
-	PriorityId  int       `json:"priorityId"`
+type NewsubModule struct {
+	ProjectId     int       `json:"projectId"`
+	SubModuleName string    `json:"subModuleName"`
+	Description   string    `json:"description"`
+	StartDate     time.Time `json:"startDate"`
+	TargetDate    time.Time `json:"targetDate"`
+	CreatedBy     int       `json:"createdBy"`
+	PicId         int       `json:"picId"`
+	PriorityId    int       `json:"priorityId"`
 }
 
-type AlterBacklog struct {
-	BacklogId   int        `json:"backlogId"`
-	BacklogName *string    `json:"backlogName"`
-	Description *string    `json:"description"`
-	StartDate   *time.Time `json:"startDate"`
-	TargetDate  *time.Time `json:"targetDate"`
-	PicId       *int       `json:"picId"`
-	PriorityId  *int       `json:"priorityId"`
+type AltersubModule struct {
+	SubModuleId   int        `json:"subModuleId"`
+	SubModuleName *string    `json:"subModuleName"`
+	Description   *string    `json:"description"`
+	StartDate     *time.Time `json:"startDate"`
+	TargetDate    *time.Time `json:"targetDate"`
+	PicId         *int       `json:"picId"`
+	PriorityId    *int       `json:"priorityId"`
 }
 
 type NewWork struct {
-	BacklogId      int       `json:"backlogId"`
+	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
 	StartDate      time.Time `json:"startDate"`
@@ -92,7 +92,7 @@ type NewWork struct {
 }
 
 type NewBug struct {
-	BacklogId      int       `json:"backlogId"`
+	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
 	StartDate      time.Time `json:"startDate"`
@@ -177,15 +177,15 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
 
-	// Backlog
-	router.GET("/getProjectBacklogs", getProjectBacklogs)
-	router.POST("/postNewBacklog", postNewBacklog)
-	router.PUT("/putAlterBacklog", putAlterBacklog)
-	router.DELETE("/dropBacklog", dropBacklog)
+	// subModule
+	router.GET("/getProjectsubModules", getProjectsubModules)
+	router.POST("/postNewsubModule", postNewsubModule)
+	router.PUT("/putAltersubModule", putAltersubModule)
+	router.DELETE("/dropsubModule", dropsubModule)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)
-	router.GET("/getBacklogWorks", getBacklogWorks)
+	router.GET("/getsubModuleWorks", getsubModuleWorks)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
@@ -480,7 +480,7 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 
 }
 
-func getProjectBacklogs(c *gin.Context) {
+func getProjectsubModules(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
 	if checkEmpty(c, projectIdInput) {
@@ -495,8 +495,8 @@ func getProjectBacklogs(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func postNewBacklog(c *gin.Context) {
-	var nb NewBacklog
+func postNewsubModule(c *gin.Context) {
+	var nb NewsubModule
 	if err := c.BindJSON(&nb); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
@@ -505,7 +505,7 @@ func postNewBacklog(c *gin.Context) {
 	query := `CALL project_manager.post_new_sub_module($1,$2,$3,$4,$5,$6,$7,$8)`
 	if _, err := db.Exec(query,
 		nb.ProjectId,
-		nb.BacklogName,
+		nb.SubModuleName,
 		nb.Description,
 		nb.StartDate,
 		nb.TargetDate,
@@ -520,9 +520,9 @@ func postNewBacklog(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Sub-module created successfully")
 }
 
-func putAlterBacklog(c *gin.Context) {
+func putAltersubModule(c *gin.Context) {
 
-	var alterTarget AlterBacklog
+	var alterTarget AltersubModule
 	if err := c.BindJSON(&alterTarget); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
@@ -530,43 +530,43 @@ func putAlterBacklog(c *gin.Context) {
 
 	query := `CALL project_manager.put_alter_sub_module($1, $2, $3, $4, $5, $6, $7)`
 	if _, err := db.Exec(query,
-		alterTarget.BacklogId,
-		alterTarget.BacklogName,
+		alterTarget.SubModuleId,
+		alterTarget.SubModuleName,
 		alterTarget.Description,
 		alterTarget.StartDate,
 		alterTarget.TargetDate,
 		alterTarget.PicId,
 		alterTarget.PriorityId,
 	); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to update backlog")
+		checkErr(c, http.StatusBadRequest, err, "Failed to update subModule")
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "Backlog updated successfully"})
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "subModule updated successfully"})
 }
 
-func dropBacklog(c *gin.Context) {
-	var backlogIdInput = c.Query("backlogId")
-	if checkEmpty(c, backlogIdInput) {
+func dropsubModule(c *gin.Context) {
+	var subModuleIdInput = c.Query("subModuleId")
+	if checkEmpty(c, subModuleIdInput) {
 		return
 	}
 	query := `CALL project_manager.drop_sub_module($1)`
-	if _, err := db.Exec(query, backlogIdInput); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Failed to drop backlog")
+	if _, err := db.Exec(query, subModuleIdInput); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to drop subModule")
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, "Backlog dropped successfully")
+	c.IndentedJSON(http.StatusOK, "subModule dropped successfully")
 }
 
-func getBacklogWorks(c *gin.Context) {
+func getsubModuleWorks(c *gin.Context) {
 	var data string
-	backlogIdInput := c.Query("backlogId")
-	if checkEmpty(c, backlogIdInput) {
+	subModuleIdInput := c.Query("subModuleId")
+	if checkEmpty(c, subModuleIdInput) {
 		return
 	}
 	query := `SELECT project_manager.get_sub_module_works($1)`
-	if err := db.QueryRow(query, backlogIdInput).Scan(&data); err != nil {
+	if err := db.QueryRow(query, subModuleIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get sub-module works")
 		return
 	}
@@ -625,7 +625,7 @@ func postNewWork(c *gin.Context) {
 		nw.ActivityId,
 		nw.UsersAdded,
 		nw.EstimatedHours,
-		nw.BacklogId,
+		nw.SubModuleId,
 	)
 	if err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")

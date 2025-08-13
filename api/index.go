@@ -189,6 +189,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
+	router.GET("/getWorkNameListOfProject", getWorkNameListOfProject)
 
 	// Bug
 	router.GET("/getProjectBugs", getProjectBugs)
@@ -204,6 +205,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getProjectAssignedUsernames", getProjectAssignedUsernames)
 	router.GET("/getStartBundle", getTrackerActivityPriorityStateList)
 	router.GET("/getProjectAndWorkNames", getProjectAndWorkNames)
+	router.GET("/getDefectCauseList", getDefectCauseList)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -340,6 +342,22 @@ func getProjectAndWorkNames(c *gin.Context) {
 	query := `SELECT project_manager.get_project_and_work_names($1)`
 	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get project and work names")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getWorkNameListOfProject(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_work_name_list_of_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get work name list of project")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
@@ -714,6 +732,17 @@ func getProjectBugs(c *gin.Context) {
 func getTrackerActivityPriorityStateList(c *gin.Context) {
 	var data string
 	query := `SELECT project_manager.get_tracker_activity_priority_state_list()`
+	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get start data")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getDefectCauseList(c *gin.Context) {
+	var data string
+	query := `SELECT project_manager.get_defect_cause_list()`
 	if err := db.QueryRow(query).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get start data")
 		return

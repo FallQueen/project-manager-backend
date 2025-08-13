@@ -54,7 +54,7 @@ type AlterProject struct {
 	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
-type NewsubModule struct {
+type NewSubModule struct {
 	ProjectId     int       `json:"projectId"`
 	SubModuleName string    `json:"subModuleName"`
 	Description   string    `json:"description"`
@@ -65,7 +65,7 @@ type NewsubModule struct {
 	PriorityId    int       `json:"priorityId"`
 }
 
-type AltersubModule struct {
+type AlterSubModule struct {
 	SubModuleId   int        `json:"subModuleId"`
 	SubModuleName *string    `json:"subModuleName"`
 	Description   *string    `json:"description"`
@@ -178,14 +178,14 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.PUT("/putUserProjectRole", putUserProjectRole)
 
 	// subModule
-	router.GET("/getProjectsubModules", getProjectsubModules)
-	router.POST("/postNewsubModule", postNewsubModule)
-	router.PUT("/putAltersubModule", putAltersubModule)
-	router.DELETE("/dropsubModule", dropsubModule)
+	router.GET("/getProjectSubModules", getProjectSubModules)
+	router.POST("/postNewSubModule", postNewSubModule)
+	router.PUT("/putAlterSubModule", putAlterSubModule)
+	router.DELETE("/dropSubModule", dropSubModule)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)
-	router.GET("/getsubModuleWorks", getsubModuleWorks)
+	router.GET("/getSubModuleWorks", getSubModuleWorks)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
@@ -480,7 +480,7 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 
 }
 
-func getProjectsubModules(c *gin.Context) {
+func getProjectSubModules(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
 	if checkEmpty(c, projectIdInput) {
@@ -495,8 +495,8 @@ func getProjectsubModules(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func postNewsubModule(c *gin.Context) {
-	var nb NewsubModule
+func postNewSubModule(c *gin.Context) {
+	var nb NewSubModule
 	if err := c.BindJSON(&nb); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
@@ -520,9 +520,9 @@ func postNewsubModule(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Sub-module created successfully")
 }
 
-func putAltersubModule(c *gin.Context) {
+func putAlterSubModule(c *gin.Context) {
 
-	var alterTarget AltersubModule
+	var alterTarget AlterSubModule
 	if err := c.BindJSON(&alterTarget); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
@@ -545,7 +545,7 @@ func putAltersubModule(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "subModule updated successfully"})
 }
 
-func dropsubModule(c *gin.Context) {
+func dropSubModule(c *gin.Context) {
 	var subModuleIdInput = c.Query("subModuleId")
 	if checkEmpty(c, subModuleIdInput) {
 		return
@@ -559,7 +559,7 @@ func dropsubModule(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "subModule dropped successfully")
 }
 
-func getsubModuleWorks(c *gin.Context) {
+func getSubModuleWorks(c *gin.Context) {
 	var data string
 	subModuleIdInput := c.Query("subModuleId")
 	if checkEmpty(c, subModuleIdInput) {

@@ -748,9 +748,9 @@ func postNewBug(c *gin.Context) {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-
+	query := `CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
 	if _, err := db.Exec(
-		`CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		query,
 		nb.WorkName,
 		nb.PriorityId,
 		nb.PicId,
@@ -779,7 +779,7 @@ func putAlterBug(c *gin.Context) {
 	}
 
 	query := `CALL project_manager.put_alter_bug($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
-
+	log.Printf("%+v\n", alterTarget)
 	if _, err := db.Exec(query,
 		alterTarget.WorkId,
 		alterTarget.WorkName,

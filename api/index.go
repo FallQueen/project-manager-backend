@@ -12,7 +12,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 )
 
 // User represents a user for authentication purposes.
@@ -143,9 +142,9 @@ var (
 // For a Vercel serverless function, this serves as the cold-start entry point.
 func init() {
 	// Establish the database connection pool.
-	if err := godotenv.Load(); err != nil {
-		log.Println("Error loading .env file")
-	}
+	// if err := godotenv.Load(); err != nil {
+	// 	log.Println("Error loading .env file")
+	// }
 	db = openDB()
 	// Create a new Gin router with default middleware.
 	app = gin.Default()

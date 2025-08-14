@@ -190,7 +190,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
-	router.GET("/getWorkNameListOfProject", getWorkNameListOfProject)
+	router.GET("/getWorkNameListOfProjectDev", getWorkNameListOfProjectDev)
 
 	// Bug
 	router.POST("/postNewBug", postNewWorkOrBug)
@@ -350,14 +350,14 @@ func getProjectAndWorkNames(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func getWorkNameListOfProject(c *gin.Context) {
+func getWorkNameListOfProjectDev(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
 	if checkEmpty(c, projectIdInput) {
 		return
 	}
 
-	query := `SELECT project_manager.get_work_name_list_of_project($1)`
+	query := `SELECT project_manager.get_work_name_list_of_project_dev($1)`
 	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get work name list of project")
 		return

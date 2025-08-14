@@ -74,7 +74,7 @@ type AlterSubModule struct {
 	PriorityId    *int       `json:"priorityId"`
 }
 
-type NewWorkOrBug struct {
+type NewWork struct {
 	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
@@ -88,12 +88,9 @@ type NewWorkOrBug struct {
 	TrackerId      int       `json:"trackerId"`
 	ActivityId     int       `json:"activityId"`
 	UsersAdded     []int     `json:"usersAdded"`
-	AffectedWork   *int      `json:"affectedWork"`
-	DefectCause    *int      `json:"defectCause"`
 }
 
 type NewBug struct {
-	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
 	StartDate      time.Time `json:"startDate"`
@@ -103,8 +100,6 @@ type NewBug struct {
 	CreatedBy      int       `json:"createdBy"`
 	PriorityId     int       `json:"priorityId"`
 	EstimatedHours int       `json:"estimatedHours"`
-	TrackerId      int       `json:"trackerId"`
-	ActivityId     int       `json:"activityId"`
 	UsersAdded     []int     `json:"usersAdded"`
 	AffectedWork   int       `json:"affectedWork"`
 	DefectCause    int       `json:"defectCause"`
@@ -122,6 +117,23 @@ type AlterWork struct {
 	EstimatedHours *int       `json:"estimatedHours"`
 	TrackerId      *int       `json:"trackerId"`
 	ActivityId     *int       `json:"activityId"`
+	UsersRemoved   []int      `json:"usersRemoved"`
+	UsersAdded     []int      `json:"usersAdded"`
+}
+type AlterBug struct {
+	WorkId         int        `json:"workId"`
+	WorkName       *string    `json:"workName"`
+	Description    *string    `json:"description"`
+	StartDate      *time.Time `json:"startDate"`
+	TargetDate     *time.Time `json:"targetDate"`
+	PicId          *int       `json:"picId"`
+	CurrentState   *int       `json:"currentState"`
+	PriorityId     *int       `json:"priorityId"`
+	EstimatedHours *int       `json:"estimatedHours"`
+	TrackerId      *int       `json:"trackerId"`
+	ActivityId     *int       `json:"activityId"`
+	AffectedWork   *int       `json:"affectedWork"`
+	DefectCause    *int       `json:"defectCause"`
 	UsersRemoved   []int      `json:"usersRemoved"`
 	UsersAdded     []int      `json:"usersAdded"`
 }
@@ -185,7 +197,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.DELETE("/dropSubModule", dropSubModule)
 
 	// Work
-	router.POST("/postNewWork", postNewWorkOrBug)
+	router.POST("/postNewWork", postNewWork)
 	router.GET("/getSubModuleWorks", getSubModuleWorks)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
@@ -193,8 +205,9 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getWorkNameListOfProjectDev", getWorkNameListOfProjectDev)
 
 	// Bug
-	router.POST("/postNewBug", postNewWorkOrBug)
+	router.POST("/postNewBug", postNewBug)
 	router.GET("/getProjectBugs", getProjectBugs)
+	router.PUT("/putAlterBug", putAlterBug)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -624,42 +637,13 @@ func getUserWorkAssignment(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func postNewWorkOrBug(c *gin.Context) {
-	var nw NewWorkOrBug
+func postNewWork(c *gin.Context) {
+	var nw NewWork
 	if err := c.BindJSON(&nw); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
 
-	// If bug-specific fields are set, treat as bug
-	if nw.DefectCause != nil || nw.AffectedWork != nil {
-		_, err := db.Exec(
-			`CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-			nw.WorkName,
-			nw.PriorityId,
-			nw.PicId,
-			nw.Description,
-			nw.CurrentState,
-			nw.CreatedBy,
-			nw.TargetDate,
-			nw.StartDate,
-			nw.TrackerId,
-			nw.ActivityId,
-			nw.UsersAdded,
-			nw.EstimatedHours,
-			nw.SubModuleId,
-			nw.AffectedWork,
-			nw.DefectCause,
-		)
-		if err != nil {
-			checkErr(c, http.StatusBadRequest, err, "Failed to create bug")
-			return
-		}
-		c.IndentedJSON(http.StatusOK, "Bug created successfully")
-		return
-	}
-
-	// Otherwise, treat as normal work
 	if _, err := db.Exec(
 		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		nw.WorkName,
@@ -670,11 +654,11 @@ func postNewWorkOrBug(c *gin.Context) {
 		nw.CreatedBy,
 		nw.TargetDate,
 		nw.StartDate,
-		nw.TrackerId,
-		nw.ActivityId,
 		nw.UsersAdded,
 		nw.EstimatedHours,
 		nw.SubModuleId,
+		nw.TrackerId,
+		nw.ActivityId,
 	); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
 		return
@@ -756,6 +740,66 @@ func getProjectBugs(c *gin.Context) {
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewBug(c *gin.Context) {
+	var nb NewBug
+	if err := c.BindJSON(&nb); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	if _, err := db.Exec(
+		`CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		nb.WorkName,
+		nb.PriorityId,
+		nb.PicId,
+		nb.Description,
+		nb.CurrentState,
+		nb.CreatedBy,
+		nb.TargetDate,
+		nb.StartDate,
+		nb.UsersAdded,
+		nb.EstimatedHours,
+		nb.DefectCause,
+		nb.AffectedWork,
+	); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create bug")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "Bug created successfully")
+}
+
+func putAlterBug(c *gin.Context) {
+	var alterTarget AlterBug
+
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input format")
+		return
+	}
+
+	query := `CALL project_manager.put_alter_bug($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+
+	if _, err := db.Exec(query,
+		alterTarget.WorkId,
+		alterTarget.WorkName,
+		alterTarget.Description,
+		alterTarget.StartDate,
+		alterTarget.TargetDate,
+		alterTarget.CurrentState,
+		alterTarget.PicId,
+		alterTarget.PriorityId,
+		alterTarget.EstimatedHours,
+		alterTarget.DefectCause,
+		alterTarget.AffectedWork,
+		alterTarget.UsersRemoved,
+		alterTarget.UsersAdded,
+	); err != nil {
+		checkErr(c, http.StatusInternalServerError, err, "Failed to alter bug details")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Successfully altered bug"})
 }
 
 func getTrackerActivityPriorityStateList(c *gin.Context) {

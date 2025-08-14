@@ -101,7 +101,7 @@ type NewBug struct {
 	PriorityId     int       `json:"priorityId"`
 	EstimatedHours int       `json:"estimatedHours"`
 	UsersAdded     []int     `json:"usersAdded"`
-	AffectedWork   int       `json:"affectedWork"`
+	workAffected   int       `json:"workAffected"`
 	DefectCause    int       `json:"defectCause"`
 }
 
@@ -132,7 +132,7 @@ type AlterBug struct {
 	EstimatedHours *int       `json:"estimatedHours"`
 	TrackerId      *int       `json:"trackerId"`
 	ActivityId     *int       `json:"activityId"`
-	AffectedWork   *int       `json:"affectedWork"`
+	workAffected   *int       `json:"workAffected"`
 	DefectCause    *int       `json:"defectCause"`
 	UsersRemoved   []int      `json:"usersRemoved"`
 	UsersAdded     []int      `json:"usersAdded"`
@@ -762,7 +762,7 @@ func postNewBug(c *gin.Context) {
 		nb.UsersAdded,
 		nb.EstimatedHours,
 		nb.DefectCause,
-		nb.AffectedWork,
+		nb.workAffected,
 	); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create bug")
 		return
@@ -791,7 +791,7 @@ func putAlterBug(c *gin.Context) {
 		alterTarget.PriorityId,
 		alterTarget.EstimatedHours,
 		alterTarget.DefectCause,
-		alterTarget.AffectedWork,
+		alterTarget.workAffected,
 		alterTarget.UsersRemoved,
 		alterTarget.UsersAdded,
 	); err != nil {

@@ -75,7 +75,7 @@ type AlterSubModule struct {
 	PriorityId    *int       `json:"priorityId"`
 }
 
-type NewWork struct {
+type NewWorkOrBug struct {
 	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
@@ -89,6 +89,8 @@ type NewWork struct {
 	TrackerId      int       `json:"trackerId"`
 	ActivityId     int       `json:"activityId"`
 	UsersAdded     []int     `json:"usersAdded"`
+	AffectedWork   *int      `json:"affectedWork"`
+	DefectCause    *int      `json:"defectCause"`
 }
 
 type NewBug struct {
@@ -184,7 +186,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.DELETE("/dropSubModule", dropSubModule)
 
 	// Work
-	router.POST("/postNewWork", postNewWork)
+	router.POST("/postNewWork", postNewWorkOrBug)
 	router.GET("/getSubModuleWorks", getSubModuleWorks)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
@@ -192,6 +194,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getWorkNameListOfProject", getWorkNameListOfProject)
 
 	// Bug
+	router.POST("/postNewBug", postNewWorkOrBug)
 	router.GET("/getProjectBugs", getProjectBugs)
 
 	// User Work Assignment
@@ -622,14 +625,43 @@ func getUserWorkAssignment(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
-func postNewWork(c *gin.Context) {
-	var nw NewWork
+func postNewWorkOrBug(c *gin.Context) {
+	var nw NewWorkOrBug
 	if err := c.BindJSON(&nw); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
 
-	_, err := db.Exec(
+	// If bug-specific fields are set, treat as bug
+	if nw.DefectCause != nil || nw.AffectedWork != nil {
+		_, err := db.Exec(
+			`CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+			nw.WorkName,
+			nw.PriorityId,
+			nw.PicId,
+			nw.Description,
+			nw.CurrentState,
+			nw.CreatedBy,
+			nw.TargetDate,
+			nw.StartDate,
+			nw.TrackerId,
+			nw.ActivityId,
+			nw.UsersAdded,
+			nw.EstimatedHours,
+			nw.SubModuleId,
+			nw.AffectedWork,
+			nw.DefectCause,
+		)
+		if err != nil {
+			checkErr(c, http.StatusBadRequest, err, "Failed to create bug")
+			return
+		}
+		c.IndentedJSON(http.StatusOK, "Bug created successfully")
+		return
+	}
+
+	// Otherwise, treat as normal work
+	if _, err := db.Exec(
 		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		nw.WorkName,
 		nw.PriorityId,
@@ -644,12 +676,10 @@ func postNewWork(c *gin.Context) {
 		nw.UsersAdded,
 		nw.EstimatedHours,
 		nw.SubModuleId,
-	)
-	if err != nil {
+	); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
 		return
 	}
-
 	c.IndentedJSON(http.StatusOK, "Work created successfully")
 }
 

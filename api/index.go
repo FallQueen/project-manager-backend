@@ -185,10 +185,14 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getUserProjects", getUserProjects)
 	router.PUT("/putAlterProject", putAlterProject)
 	router.DELETE("/dropProject", dropProject)
+	router.GET("/getGanttDataOfProject", getGanttDataOfProject)
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
+
+	// Module
+	router.GET("/getModulesOfProject", getModulesOfProject)
 
 	// subModule
 	router.GET("/getProjectSubModules", getProjectSubModules)
@@ -379,6 +383,22 @@ func getWorkNameListOfProjectDev(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
+func getModulesOfProject(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_modules_of_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get modules of project")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
 func getAllProjects(c *gin.Context) {
 	var data string
 
@@ -472,6 +492,23 @@ func dropProject(c *gin.Context) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, "Project dropped successfully")
+}
+
+func getGanttDataOfProject(c *gin.Context) {
+	var data string
+	var projectIdInput = c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	// Call the function to get the projects data
+	query := `SELECT project_manager.get_gantt_data_of_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get gantt data")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
 func getUserProjectRoles(c *gin.Context) {
@@ -644,8 +681,9 @@ func postNewWork(c *gin.Context) {
 		return
 	}
 
-	if _, err := db.Exec(
-		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+	var newWorkId int
+	if err := db.QueryRow(
+		`SELECT project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		nw.WorkName,
 		nw.PriorityId,
 		nw.PicId,
@@ -659,11 +697,11 @@ func postNewWork(c *gin.Context) {
 		nw.SubModuleId,
 		nw.TrackerId,
 		nw.ActivityId,
-	); err != nil {
+	).Scan(&newWorkId); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
 		return
 	}
-	c.IndentedJSON(http.StatusOK, "Work created successfully")
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Work created successfully", "workId": newWorkId})
 }
 
 func putAlterWork(c *gin.Context) {

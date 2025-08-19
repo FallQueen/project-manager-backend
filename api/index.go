@@ -193,6 +193,7 @@ func registerRoutes(router *gin.RouterGroup) {
 
 	// Module
 	router.GET("/getModulesOfProject", getModulesOfProject)
+	router.GET("/getModuleDetails", getModuleDetails)
 
 	// subModule
 	router.GET("/getProjectSubModules", getProjectSubModules)
@@ -203,6 +204,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Work
 	router.POST("/postNewWork", postNewWork)
 	router.GET("/getSubModuleWorks", getSubModuleWorks)
+	router.GET("/getWorkDetails", getWorkDetails)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
@@ -212,6 +214,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.POST("/postNewBug", postNewBug)
 	router.GET("/getProjectBugs", getProjectBugs)
 	router.PUT("/putAlterBug", putAlterBug)
+	router.GET("/getBugDetails", getBugDetails)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -393,6 +396,22 @@ func getModulesOfProject(c *gin.Context) {
 	query := `SELECT project_manager.get_modules_of_project($1)`
 	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get modules of project")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getModuleDetails(c *gin.Context) {
+	var data string
+	moduleIdInput := c.Query("moduleId")
+	if checkEmpty(c, moduleIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_module_details($1)`
+	if err := db.QueryRow(query, moduleIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get module details")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
@@ -751,6 +770,21 @@ func dropWork(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Work dropped successfully")
 }
 
+func getWorkDetails(c *gin.Context) {
+	var data string
+	workIdInput := c.Query("workId")
+	if checkEmpty(c, workIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_work_details($1)`
+	if err := db.QueryRow(query, workIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get work details")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
 func putAlterUserWorkAssignment(c *gin.Context) {
 	var alterTarget UserWorkChange
 	if err := c.BindJSON(&alterTarget); err != nil {
@@ -838,6 +872,22 @@ func putAlterBug(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"message": "Successfully altered bug"})
+}
+
+func getBugDetails(c *gin.Context) {
+	var data string
+	bugIdInput := c.Query("bugId")
+	if checkEmpty(c, bugIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_bug_details($1)`
+	if err := db.QueryRow(query, bugIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get bug details")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
 func getTrackerActivityPriorityStateList(c *gin.Context) {

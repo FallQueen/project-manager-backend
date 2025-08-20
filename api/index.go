@@ -53,6 +53,19 @@ type AlterProject struct {
 	UserRoles   []UserRoleChange `json:"userRoles"`
 }
 
+type NewModule struct {
+	ProjectId   int    `json:"projectId"`
+	ModuleName  string `json:"moduleName"`
+	Description string `json:"description"`
+	CreatedBy   int    `json:"createdBy"`
+}
+
+type AlterModule struct {
+	ModuleId    int     `json:"moduleId"`
+	ModuleName  *string `json:"moduleName"`
+	Description *string `json:"description"`
+}
+
 type NewSubModule struct {
 	ProjectId     int       `json:"projectId"`
 	SubModuleName string    `json:"subModuleName"`
@@ -182,6 +195,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Project
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getAllProjects", getAllProjects)
+	router.GET("/getProjectDetails", getProjectDetails)
 	router.GET("/getUserProjects", getUserProjects)
 	router.PUT("/putAlterProject", putAlterProject)
 	router.DELETE("/dropProject", dropProject)
@@ -194,6 +208,8 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Module
 	router.GET("/getModulesOfProject", getModulesOfProject)
 	router.GET("/getModuleDetails", getModuleDetails)
+	router.POST("/postNewModule", postNewModule)
+	router.PUT("/putAlterModule", putAlterModule)
 
 	// subModule
 	router.GET("/getProjectSubModules", getProjectSubModules)
@@ -418,6 +434,38 @@ func getModuleDetails(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
+func postNewModule(c *gin.Context) {
+	var nm NewModule
+	if err := c.BindJSON(&nm); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.post_new_module($1,$2,$3,$4)`
+	if _, err := db.Exec(query, nm.ProjectId, nm.ModuleName, nm.Description, nm.CreatedBy); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create module")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Module created successfully"})
+}
+
+func putAlterModule(c *gin.Context) {
+	var alterTarget AlterModule
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.put_alter_module($1,$2,$3)`
+	if _, err := db.Exec(query, alterTarget.ModuleId, alterTarget.ModuleName, alterTarget.Description); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create module")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Module updated successfully"})
+}
+
 func getAllProjects(c *gin.Context) {
 	var data string
 
@@ -442,6 +490,23 @@ func getUserProjects(c *gin.Context) {
 	query := `SELECT project_manager.get_projects($1)`
 	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get projects")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getProjectDetails(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	// Call the function to get the project details
+	query := `SELECT project_manager.get_project_details($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project details")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.

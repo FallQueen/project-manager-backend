@@ -1,6 +1,6 @@
-// package main
+package main
 
-package handler
+// package handler
 
 import (
 	"database/sql"
@@ -63,6 +63,15 @@ type NewSubModule struct {
 	CreatedBy     int       `json:"createdBy"`
 	PicId         int       `json:"picId"`
 	PriorityId    int       `json:"priorityId"`
+}
+type NewModule struct {
+	ModuleID    int    `json:"moduleId"`
+	ModuleName  string `json:"moduleName"`
+	ProjectID   int    `json:"projectId"`
+	Description string `json:"description"`
+	CreatedBy   int    `json:"createdBy"`
+	PriorityID  int    `json:"priorityId"`
+	PicID       int    `json:"picId"`
 }
 
 type AlterSubModule struct {
@@ -177,11 +186,16 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
 
+	//module
+	router.GET("/getProjectModules", getModulesByProject)
+	router.POST("/postNewModule", postNewModule)
+
 	// subModule
 	router.GET("/getProjectSubModules", getProjectSubModules)
 	router.POST("/postNewSubModule", postNewSubModule)
 	router.PUT("/putAlterSubModule", putAlterSubModule)
 	router.DELETE("/dropSubModule", dropSubModule)
+	router.GET("/getProjectSubModulesByModule", getProjectSubModulesByModule)
 
 	// Work
 	router.POST("/postNewWork", postNewWork)
@@ -212,11 +226,11 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 }
 
 // main is the entry point for local development. It is ignored by Vercel.
-// func main() {
-// 	port := "9090"
-// 	log.Printf("INFO: Starting local server on http://localhost:%s\n", port)
-// 	http.ListenAndServe(":"+port, http.HandlerFunc(Handler))
-// }
+func main() {
+	port := "9090"
+	log.Printf("INFO: Starting local server on http://localhost:%s\n", port)
+	http.ListenAndServe(":"+port, http.HandlerFunc(Handler))
+}
 
 // openDB establishes a connection to the PostgreSQL database.
 // It uses the DATABASE_URL environment variable for establishing the connection
@@ -480,6 +494,57 @@ func AlterUserProjectRole(c *gin.Context, alterTarget UserRoleChange) error {
 
 }
 
+func getModulesByProject(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_module_by_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get modules")
+		return
+	}
+
+	// Return JSON langsung dari PostgreSQL
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewModule(c *gin.Context) {
+	log.Println("INFO: Received request to create a new module")
+	var nm NewModule
+	if err := c.BindJSON(&nm); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	var moduleID int
+	query := `SELECT project_manager.add_module($1,$2,$3,$4,$5,$6)`
+	if err := db.QueryRow(query,
+		nm.ModuleName,
+		nm.ProjectID,
+		nm.Description,
+		nm.CreatedBy,
+		nm.PriorityID,
+		nm.PicID,
+	).Scan(&moduleID); err != nil {
+		log.Printf("DB error: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   err.Error(),
+			"message": "Failed to create module",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "Module created successfully",
+		"module_id": moduleID,
+	})
+
+}
+
 func getProjectSubModules(c *gin.Context) {
 	var data string
 	projectIdInput := c.Query("projectId")
@@ -493,6 +558,22 @@ func getProjectSubModules(c *gin.Context) {
 	}
 	// Return the raw JSON data from the database directly to the client.
 	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getProjectSubModulesByModule(c *gin.Context) {
+	var data string
+	moduleIdInput := c.Query("moduleId")
+	if checkEmpty(c, moduleIdInput) {
+		return
+	}
+	query := `SELECT project_manager.get_sub_modules($1)`
+	if err := db.QueryRow(query, moduleIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project sub-modules")
+		return
+
+	}
+	c.Data(http.StatusOK, "application/json", []byte(data))
+
 }
 
 func postNewSubModule(c *gin.Context) {

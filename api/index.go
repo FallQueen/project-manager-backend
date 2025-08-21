@@ -12,7 +12,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 )
 
 // User represents a user for authentication purposes.
@@ -52,6 +51,20 @@ type AlterProject struct {
 	TargetDate  *time.Time       `json:"targetDate"`
 	PicId       *int             `json:"picId"`
 	UserRoles   []UserRoleChange `json:"userRoles"`
+	ProjectDone *bool            `json:"projectDone"`
+}
+
+type NewModule struct {
+	ProjectId   int    `json:"projectId"`
+	ModuleName  string `json:"moduleName"`
+	Description string `json:"description"`
+	CreatedBy   int    `json:"createdBy"`
+}
+
+type AlterModule struct {
+	ModuleId    int     `json:"moduleId"`
+	ModuleName  *string `json:"moduleName"`
+	Description *string `json:"description"`
 }
 
 type NewSubModule struct {
@@ -101,7 +114,6 @@ type NewWork struct {
 }
 
 type NewBug struct {
-	SubModuleId    int       `json:"subModuleId"`
 	WorkName       string    `json:"workName"`
 	Description    string    `json:"description"`
 	StartDate      time.Time `json:"startDate"`
@@ -111,10 +123,8 @@ type NewBug struct {
 	CreatedBy      int       `json:"createdBy"`
 	PriorityId     int       `json:"priorityId"`
 	EstimatedHours int       `json:"estimatedHours"`
-	TrackerId      int       `json:"trackerId"`
-	ActivityId     int       `json:"activityId"`
 	UsersAdded     []int     `json:"usersAdded"`
-	AffectedWork   int       `json:"affectedWork"`
+	WorkAffected   int       `json:"workAffected"`
 	DefectCause    int       `json:"defectCause"`
 }
 
@@ -130,6 +140,23 @@ type AlterWork struct {
 	EstimatedHours *int       `json:"estimatedHours"`
 	TrackerId      *int       `json:"trackerId"`
 	ActivityId     *int       `json:"activityId"`
+	UsersRemoved   []int      `json:"usersRemoved"`
+	UsersAdded     []int      `json:"usersAdded"`
+}
+type AlterBug struct {
+	WorkId         int        `json:"workId"`
+	WorkName       *string    `json:"workName"`
+	Description    *string    `json:"description"`
+	StartDate      *time.Time `json:"startDate"`
+	TargetDate     *time.Time `json:"targetDate"`
+	PicId          *int       `json:"picId"`
+	CurrentState   *int       `json:"currentState"`
+	PriorityId     *int       `json:"priorityId"`
+	EstimatedHours *int       `json:"estimatedHours"`
+	TrackerId      *int       `json:"trackerId"`
+	ActivityId     *int       `json:"activityId"`
+	WorkAffected   *int       `json:"workAffected"`
+	DefectCause    *int       `json:"defectCause"`
 	UsersRemoved   []int      `json:"usersRemoved"`
 	UsersAdded     []int      `json:"usersAdded"`
 }
@@ -150,9 +177,9 @@ var (
 // For a Vercel serverless function, this serves as the cold-start entry point.
 func init() {
 	// Establish the database connection pool.
-	if err := godotenv.Load(); err != nil {
-		log.Println("Error loading .env file")
-	}
+	// if err := godotenv.Load(); err != nil {
+	// 	log.Println("Error loading .env file")
+	// }
 	db = openDB()
 	// Create a new Gin router with default middleware.
 	app = gin.Default()
@@ -178,13 +205,21 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Project
 	router.POST("/postNewProject", postNewProject)
 	router.GET("/getAllProjects", getAllProjects)
+	router.GET("/getProjectDetails", getProjectDetails)
 	router.GET("/getUserProjects", getUserProjects)
 	router.PUT("/putAlterProject", putAlterProject)
 	router.DELETE("/dropProject", dropProject)
+	router.GET("/getGanttDataOfProject", getGanttDataOfProject)
 
 	// User Project Roles
 	router.GET("/getUserProjectRoles", getUserProjectRoles)
 	router.PUT("/putUserProjectRole", putUserProjectRole)
+
+	// Module
+	router.GET("/getModulesOfProject", getModulesOfProject)
+	router.GET("/getModuleDetails", getModuleDetails)
+	router.POST("/postNewModule", postNewModule)
+	router.PUT("/putAlterModule", putAlterModule)
 
 	//module
 	router.GET("/getProjectModules", getModulesByProject)
@@ -200,12 +235,17 @@ func registerRoutes(router *gin.RouterGroup) {
 	// Work
 	router.POST("/postNewWork", postNewWork)
 	router.GET("/getSubModuleWorks", getSubModuleWorks)
+	router.GET("/getWorkDetails", getWorkDetails)
 	router.PUT("/putAlterWork", putAlterWork)
 	router.DELETE("/dropWork", dropWork)
 	router.GET("/getUserTodoList", getUserTodoList)
+	router.GET("/getWorkNameListOfProjectDev", getWorkNameListOfProjectDev)
 
 	// Bug
+	router.POST("/postNewBug", postNewBug)
 	router.GET("/getProjectBugs", getProjectBugs)
+	router.PUT("/putAlterBug", putAlterBug)
+	router.GET("/getBugDetails", getBugDetails)
 
 	// User Work Assignment
 	router.GET("/getUserWorkAssignment", getUserWorkAssignment)
@@ -218,6 +258,7 @@ func registerRoutes(router *gin.RouterGroup) {
 	router.GET("/getProjectAssignedUsernames", getProjectAssignedUsernames)
 	router.GET("/getStartBundle", getTrackerActivityPriorityStateList)
 	router.GET("/getProjectAndWorkNames", getProjectAndWorkNames)
+	router.GET("/getDefectCauseList", getDefectCauseList)
 }
 
 // Handler is the entry point for Vercel Serverless Functions.
@@ -360,6 +401,86 @@ func getProjectAndWorkNames(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
+func getWorkNameListOfProjectDev(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_work_name_list_of_project_dev($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get work name list of project")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getModulesOfProject(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_modules_of_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get modules of project")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getModuleDetails(c *gin.Context) {
+	var data string
+	moduleIdInput := c.Query("moduleId")
+	if checkEmpty(c, moduleIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_module_details($1)`
+	if err := db.QueryRow(query, moduleIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get module details")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func postNewModule(c *gin.Context) {
+	var nm NewModule
+	if err := c.BindJSON(&nm); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+
+	query := `CALL project_manager.post_new_module($1,$2,$3,$4)`
+	if _, err := db.Exec(query, nm.ProjectId, nm.ModuleName, nm.Description, nm.CreatedBy); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create module")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Module created successfully"})
+}
+
+func putAlterModule(c *gin.Context) {
+	var alterTarget AlterModule
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+	log.Println("Updating module:", alterTarget.ModuleId, alterTarget.ModuleName, alterTarget.Description)
+	query := `CALL project_manager.put_alter_module($1,$2,$3)`
+	if _, err := db.Exec(query, alterTarget.ModuleId, alterTarget.ModuleName, alterTarget.Description); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create module")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Module updated successfully"})
+}
+
 func getAllProjects(c *gin.Context) {
 	var data string
 
@@ -384,6 +505,23 @@ func getUserProjects(c *gin.Context) {
 	query := `SELECT project_manager.get_projects($1)`
 	if err := db.QueryRow(query, userIdInput).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get projects")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getProjectDetails(c *gin.Context) {
+	var data string
+	projectIdInput := c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	// Call the function to get the project details
+	query := `SELECT project_manager.get_project_details($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get project details")
 		return
 	}
 	// Return the raw JSON data from the database directly to the client.
@@ -423,8 +561,8 @@ func putAlterProject(c *gin.Context) {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-	query := `CALL project_manager.put_alter_project($1,$2,$3,$4,$5)`
-	if _, err := db.Exec(query, ap.ProjectId, ap.ProjectName, ap.Description, ap.TargetDate, ap.PicId); err != nil {
+	query := `CALL project_manager.put_alter_project($1,$2,$3,$4,$5, $6)`
+	if _, err := db.Exec(query, ap.ProjectId, ap.ProjectName, ap.Description, ap.TargetDate, ap.PicId, ap.ProjectDone); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to update project")
 		return
 	}
@@ -453,6 +591,23 @@ func dropProject(c *gin.Context) {
 		return
 	}
 	c.IndentedJSON(http.StatusOK, "Project dropped successfully")
+}
+
+func getGanttDataOfProject(c *gin.Context) {
+	var data string
+	var projectIdInput = c.Query("projectId")
+	if checkEmpty(c, projectIdInput) {
+		return
+	}
+
+	// Call the function to get the projects data
+	query := `SELECT project_manager.get_gantt_data_of_project($1)`
+	if err := db.QueryRow(query, projectIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get gantt data")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
 func getUserProjectRoles(c *gin.Context) {
@@ -692,8 +847,9 @@ func postNewWork(c *gin.Context) {
 		return
 	}
 
-	_, err := db.Exec(
-		`CALL project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+	var newWorkId int
+	if err := db.QueryRow(
+		`SELECT project_manager.post_new_work($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		nw.WorkName,
 		nw.PriorityId,
 		nw.PicId,
@@ -702,18 +858,16 @@ func postNewWork(c *gin.Context) {
 		nw.CreatedBy,
 		nw.TargetDate,
 		nw.StartDate,
-		nw.TrackerId,
-		nw.ActivityId,
 		nw.UsersAdded,
 		nw.EstimatedHours,
 		nw.SubModuleId,
-	)
-	if err != nil {
+		nw.TrackerId,
+		nw.ActivityId,
+	).Scan(&newWorkId); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create work")
 		return
 	}
-
-	c.IndentedJSON(http.StatusOK, "Work created successfully")
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Work created successfully", "workId": newWorkId})
 }
 
 func putAlterWork(c *gin.Context) {
@@ -763,6 +917,21 @@ func dropWork(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, "Work dropped successfully")
 }
 
+func getWorkDetails(c *gin.Context) {
+	var data string
+	workIdInput := c.Query("workId")
+	if checkEmpty(c, workIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_work_details($1)`
+	if err := db.QueryRow(query, workIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get work details")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
 func putAlterUserWorkAssignment(c *gin.Context) {
 	var alterTarget UserWorkChange
 	if err := c.BindJSON(&alterTarget); err != nil {
@@ -792,9 +961,96 @@ func getProjectBugs(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(data))
 }
 
+func postNewBug(c *gin.Context) {
+	var nb NewBug
+	if err := c.BindJSON(&nb); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input")
+		return
+	}
+	query := `CALL project_manager.post_new_bug($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`
+	if _, err := db.Exec(
+		query,
+		nb.WorkName,
+		nb.PriorityId,
+		nb.PicId,
+		nb.Description,
+		nb.CurrentState,
+		nb.CreatedBy,
+		nb.TargetDate,
+		nb.StartDate,
+		nb.UsersAdded,
+		nb.EstimatedHours,
+		nb.DefectCause,
+		nb.WorkAffected,
+	); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to create bug")
+		return
+	}
+	c.IndentedJSON(http.StatusOK, "Bug created successfully")
+}
+
+func putAlterBug(c *gin.Context) {
+	var alterTarget AlterBug
+
+	if err := c.BindJSON(&alterTarget); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Invalid input format")
+		return
+	}
+
+	query := `CALL project_manager.put_alter_bug($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
+	log.Printf("%+v\n", alterTarget)
+	if _, err := db.Exec(query,
+		alterTarget.WorkId,
+		alterTarget.WorkName,
+		alterTarget.Description,
+		alterTarget.StartDate,
+		alterTarget.TargetDate,
+		alterTarget.CurrentState,
+		alterTarget.PicId,
+		alterTarget.PriorityId,
+		alterTarget.EstimatedHours,
+		alterTarget.DefectCause,
+		alterTarget.WorkAffected,
+		alterTarget.UsersRemoved,
+		alterTarget.UsersAdded,
+	); err != nil {
+		checkErr(c, http.StatusInternalServerError, err, "Failed to alter bug details")
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"message": "Successfully altered bug"})
+}
+
+func getBugDetails(c *gin.Context) {
+	var data string
+	bugIdInput := c.Query("bugId")
+	if checkEmpty(c, bugIdInput) {
+		return
+	}
+
+	query := `SELECT project_manager.get_bug_details($1)`
+	if err := db.QueryRow(query, bugIdInput).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get bug details")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
 func getTrackerActivityPriorityStateList(c *gin.Context) {
 	var data string
 	query := `SELECT project_manager.get_tracker_activity_priority_state_list()`
+	if err := db.QueryRow(query).Scan(&data); err != nil {
+		checkErr(c, http.StatusBadRequest, err, "Failed to get start data")
+		return
+	}
+	// Return the raw JSON data from the database directly to the client.
+	c.Data(http.StatusOK, "application/json", []byte(data))
+}
+
+func getDefectCauseList(c *gin.Context) {
+	var data string
+	query := `SELECT project_manager.get_defect_cause_list()`
 	if err := db.QueryRow(query).Scan(&data); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to get start data")
 		return

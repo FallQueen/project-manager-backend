@@ -51,6 +51,7 @@ type AlterProject struct {
 	TargetDate  *time.Time       `json:"targetDate"`
 	PicId       *int             `json:"picId"`
 	UserRoles   []UserRoleChange `json:"userRoles"`
+	ProjectDone *bool            `json:"projectDone"`
 }
 
 type NewModule struct {
@@ -456,7 +457,7 @@ func putAlterModule(c *gin.Context) {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-
+	log.Println("Updating module:", alterTarget.ModuleId, alterTarget.ModuleName, alterTarget.Description)
 	query := `CALL project_manager.put_alter_module($1,$2,$3)`
 	if _, err := db.Exec(query, alterTarget.ModuleId, alterTarget.ModuleName, alterTarget.Description); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to create module")
@@ -546,8 +547,8 @@ func putAlterProject(c *gin.Context) {
 		checkErr(c, http.StatusBadRequest, err, "Invalid input")
 		return
 	}
-	query := `CALL project_manager.put_alter_project($1,$2,$3,$4,$5)`
-	if _, err := db.Exec(query, ap.ProjectId, ap.ProjectName, ap.Description, ap.TargetDate, ap.PicId); err != nil {
+	query := `CALL project_manager.put_alter_project($1,$2,$3,$4,$5, $6)`
+	if _, err := db.Exec(query, ap.ProjectId, ap.ProjectName, ap.Description, ap.TargetDate, ap.PicId, ap.ProjectDone); err != nil {
 		checkErr(c, http.StatusBadRequest, err, "Failed to update project")
 		return
 	}

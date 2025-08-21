@@ -77,15 +77,6 @@ type NewSubModule struct {
 	PicId         int       `json:"picId"`
 	PriorityId    int       `json:"priorityId"`
 }
-type NewModule struct {
-	ModuleID    int    `json:"moduleId"`
-	ModuleName  string `json:"moduleName"`
-	ProjectID   int    `json:"projectId"`
-	Description string `json:"description"`
-	CreatedBy   int    `json:"createdBy"`
-	PriorityID  int    `json:"priorityId"`
-	PicID       int    `json:"picId"`
-}
 
 type AlterSubModule struct {
 	SubModuleId   int        `json:"subModuleId"`
@@ -665,39 +656,6 @@ func getModulesByProject(c *gin.Context) {
 
 	// Return JSON langsung dari PostgreSQL
 	c.Data(http.StatusOK, "application/json", []byte(data))
-}
-
-func postNewModule(c *gin.Context) {
-	log.Println("INFO: Received request to create a new module")
-	var nm NewModule
-	if err := c.BindJSON(&nm); err != nil {
-		checkErr(c, http.StatusBadRequest, err, "Invalid input")
-		return
-	}
-
-	var moduleID int
-	query := `SELECT project_manager.add_module($1,$2,$3,$4,$5,$6)`
-	if err := db.QueryRow(query,
-		nm.ModuleName,
-		nm.ProjectID,
-		nm.Description,
-		nm.CreatedBy,
-		nm.PriorityID,
-		nm.PicID,
-	).Scan(&moduleID); err != nil {
-		log.Printf("DB error: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   err.Error(),
-			"message": "Failed to create module",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":   "Module created successfully",
-		"module_id": moduleID,
-	})
-
 }
 
 func getProjectSubModules(c *gin.Context) {
